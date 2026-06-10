@@ -5,6 +5,8 @@ import { fileURLToPath } from 'url';
 import fs from 'fs';
 import getDb from './db.js';
 import { startScheduler, triggerScreenshotNow } from './scheduler.js';
+import { getActiveAlerts, getAllAlerts, resolveAlert } from './alertManager.js';
+import { DEFAULT_CONFIG } from './qualityAnalyzer.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -20,7 +22,10 @@ app.get('/api/urls', async (req, res) => {
   const db = await getDb();
   const urls = db.prepare(`
     SELECT u.*,
-      (SELECT COUNT(*) FROM screenshots s WHERE s.url_id = u.id) as screenshot_count
+      (SELECT COUNT(*) FROM screenshots s WHERE s.url_id = u.id) as screenshot_count,
+      (SELECT COUNT(*) FROM alerts a WHERE a.url_id = u.id AND a.status = 'active') as active_alert_count,
+      (SELECT s.quality_score FROM screenshots s WHERE s.url_id = u.id ORDER BY s.created_at DESC LIMIT 1) as last_quality_score,
+      (SELECT s.quality_level FROM screenshots s WHERE s.url_id = u.id ORDER BY s.created_at DESC LIMIT 1) as last_quality_level
     FROM urls u
     ORDER BY u.created_at DESC
   `).all();
@@ -154,6 +159,158 @@ app.get('/api/urls/:id', async (req, res) => {
     return res.status(404).json({ error: 'URL不存在' });
   }
   res.json(url);
+});
+
+app.get('/api/urls/:id/quality-config', async (req, res) => {
+  const { id } = req.params;
+  const db = await getDb();
+  let config = db.prepare('SELECT * FROM quality_configs WHERE url_id = ?').get(id);
+  if (!config) {
+    db.prepare('INSERT INTO quality_configs (url_id) VALUES (?)').run(id);
+    config = db.prepare('SELECT * FROM quality_configs WHERE url_id = ?').get(id);
+  }
+  res.json(config);
+});
+
+app.put('/api/urls/:id/quality-config', async (req, res) => {
+  const { id } = req.params;
+  const db = await getDb();
+  const existing = db.prepare('SELECT * FROM quality_configs WHERE url_id = ?').get(id);
+
+  const fields = ['sensitivity', 'min_file_size_kb', 'min_width', 'min_height',
+    'blank_page_threshold', 'error_keywords', 'consecutive_failures', 'enable_alert'];
+  const values = [];
+  const setClauses = [];
+
+  for (const f of fields) {
+    if (req.body[f] !== undefined) {
+      setClauses.push(`${f} = ?`);
+      values.push(req.body[f]);
+    }
+  }
+
+  if (setClauses.length > 0) {
+    setClauses.push('updated_at = CURRENT_TIMESTAMP');
+    values.push(id);
+    if (existing) {
+      db.prepare(`UPDATE quality_configs SET ${setClauses.join(', ')} WHERE url_id = ?`).run(...values);
+    } else {
+      db.prepare(`INSERT INTO quality_configs (url_id, ${fields.filter(f => req.body[f] !== undefined).join(', ')}) VALUES (?, ${values.slice(0, -1).map(() => '?').join(', ')})`).run(id, ...values.slice(0, -1));
+    }
+  }
+
+  const config = db.prepare('SELECT * FROM quality_configs WHERE url_id = ?').get(id);
+  res.json(config);
+});
+
+app.get('/api/urls/:id/quality-report', async (req, res) => {
+  const { id } = req.params;
+  const db = await getDb();
+  const limit = parseInt(req.query.limit) || 50;
+
+  const screenshots = db.prepare(`
+    SELECT id, created_at, quality_score, quality_level, quality_flags, file_size, width, height
+    FROM screenshots
+    WHERE url_id = ?
+    ORDER BY created_at DESC
+    LIMIT ?
+  `).all(id, limit);
+
+  const total = screenshots.length;
+  const goodCount = screenshots.filter(s => s.quality_level === 'good').length;
+  const fairCount = screenshots.filter(s => s.quality_level === 'fair').length;
+  const poorCount = screenshots.filter(s => s.quality_level === 'poor').length;
+  const badCount = screenshots.filter(s => s.quality_level === 'bad').length;
+  const avgScore = total > 0
+    ? Math.round(screenshots.reduce((sum, s) => sum + (s.quality_score || 0), 0) / total)
+    : 0;
+
+  const recent10 = screenshots.slice(0, 10);
+  let consecutiveBad = 0;
+  for (const s of recent10) {
+    if (s.quality_level === 'poor' || s.quality_level === 'bad') {
+      consecutiveBad++;
+    } else {
+      break;
+    }
+  }
+
+  const flagStats = {};
+  for (const s of screenshots) {
+    if (s.quality_flags) {
+      for (const flag of s.quality_flags.split(',')) {
+        if (flag) flagStats[flag] = (flagStats[flag] || 0) + 1;
+      }
+    }
+  }
+
+  res.json({
+    total,
+    avgScore,
+    distribution: { good: goodCount, fair: fairCount, poor: poorCount, bad: badCount },
+    consecutiveBad,
+    flagStats,
+    screenshots
+  });
+});
+
+app.get('/api/screenshots/:id/quality-checks', async (req, res) => {
+  const { id } = req.params;
+  const db = await getDb();
+  const checks = db.prepare(`
+    SELECT * FROM quality_checks WHERE screenshot_id = ? ORDER BY id
+  `).all(id);
+  const screenshot = db.prepare('SELECT * FROM screenshots WHERE id = ?').get(id);
+  res.json({ screenshot, checks });
+});
+
+app.post('/api/screenshots/:id/retake', async (req, res) => {
+  const { id } = req.params;
+  const db = await getDb();
+  const screenshot = db.prepare('SELECT * FROM screenshots WHERE id = ?').get(id);
+  if (!screenshot) {
+    return res.status(404).json({ error: '截图不存在' });
+  }
+  try {
+    const result = await triggerScreenshotNow(screenshot.url_id);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/alerts', async (req, res) => {
+  const { status, url_id, limit } = req.query;
+  try {
+    if (status === 'active' || (!status && !url_id)) {
+      if (url_id) {
+        const alerts = await getActiveAlerts(parseInt(url_id));
+        res.json(alerts);
+      } else {
+        const alerts = await getActiveAlerts();
+        res.json(alerts);
+      }
+    } else {
+      const alerts = await getAllAlerts(url_id ? parseInt(url_id) : null, parseInt(limit) || 100);
+      res.json(alerts);
+    }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put('/api/alerts/:id/resolve', async (req, res) => {
+  const { id } = req.params;
+  try {
+    await resolveAlert(parseInt(id));
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/quality-defaults', (req, res) => {
+  res.json(DEFAULT_CONFIG);
 });
 
 app.listen(PORT, async () => {

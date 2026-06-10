@@ -1,22 +1,28 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import UrlList from './pages/UrlList.jsx'
 import ScreenshotTimeline from './pages/ScreenshotTimeline.jsx'
+import QualityConfig from './pages/QualityConfig.jsx'
+import QualityReport from './pages/QualityReport.jsx'
+import AlertsCenter from './pages/AlertsCenter.jsx'
 
 export default function App() {
   return (
     <Router>
       <div className="min-h-screen bg-gray-50">
         <header className="bg-white shadow-sm border-b border-gray-200">
-          <div className="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8">
+          <div className="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8 flex justify-between items-center">
             <h1 className="text-2xl font-bold text-gray-900">
-              网页截图归档工具
+              网页截图归档与质量监控系统
             </h1>
           </div>
         </header>
         <main className="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8">
           <Routes>
             <Route path="/" element={<UrlList />} />
+            <Route path="/alerts" element={<AlertsCenter />} />
             <Route path="/url/:id" element={<ScreenshotTimeline />} />
+            <Route path="/url/:id/config" element={<QualityConfig />} />
+            <Route path="/url/:id/quality" element={<QualityReport />} />
           </Routes>
         </main>
       </div>

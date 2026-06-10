@@ -3,6 +3,8 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import getDb from './db.js';
+import { analyzeScreenshotQuality, getQualityConfig } from './qualityAnalyzer.js';
+import { checkAndUpdateAlerts } from './alertManager.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -52,26 +54,102 @@ export async function takeScreenshot(urlRecord) {
     const browser = await getBrowser();
     page = await browser.newPage();
     await page.setViewport({ width: 1920, height: 1080 });
-    await page.goto(url, { waitUntil: 'networkidle2', timeout: 60000 });
+
+    let pageText = '';
+    let statusCode = 0;
+    let failedRequests = 0;
+    let contentLength = 0;
+    const loadStart = Date.now();
+
+    page.on('response', (resp) => {
+      if (resp.request().isNavigationRequest()) {
+        statusCode = resp.status();
+        const len = resp.headers()['content-length'];
+        if (len) contentLength = parseInt(len, 10);
+      }
+      if (!resp.ok()) {
+        failedRequests++;
+      }
+    });
+
+    const expectedWidth = 1920;
+    const expectedHeight = 1080;
+
+    try {
+      await page.goto(url, { waitUntil: 'networkidle2', timeout: 60000 });
+    } catch (navErr) {
+      console.warn(`导航警告 [${url}]:`, navErr.message);
+    }
+
+    try {
+      pageText = await page.evaluate(() => document.body ? document.body.innerText : '').catch(() => '');
+    } catch (e) {
+      pageText = '';
+    }
+
     await page.screenshot({ path: filePath, fullPage: true });
 
+    const loadTimeMs = Date.now() - loadStart;
+
     const db = await getDb();
+    let qualityConfig = db.prepare('SELECT * FROM quality_configs WHERE url_id = ?').get(id);
+    if (!qualityConfig) {
+      db.prepare('INSERT INTO quality_configs (url_id) VALUES (?)').run(id);
+      qualityConfig = db.prepare('SELECT * FROM quality_configs WHERE url_id = ?').get(id);
+    }
+
+    const pageMetrics = { statusCode, failedRequests, loadTimeMs, contentLength };
+    const qualityResult = await analyzeScreenshotQuality({
+      filePath,
+      expectedWidth,
+      expectedHeight,
+      pageText,
+      pageMetrics,
+      rawConfig: qualityConfig
+    });
+
     const insertStmt = db.prepare(`
-      INSERT INTO screenshots (url_id, file_path, file_name, width, height)
-      VALUES (?, ?, ?, ?, ?)
+      INSERT INTO screenshots (url_id, file_path, file_name, width, height, file_size, quality_score, quality_level, quality_flags)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
-    const result = insertStmt.run(id, filePath, fileName, 1920, 1080);
+    const result = insertStmt.run(
+      id, filePath, fileName,
+      qualityResult.actual_width,
+      qualityResult.actual_height,
+      qualityResult.file_size,
+      qualityResult.score,
+      qualityResult.level,
+      qualityResult.flags
+    );
+    const screenshotId = result.lastInsertRowid;
+
+    for (const check of qualityResult.checks) {
+      db.prepare(`
+        INSERT INTO quality_checks (screenshot_id, url_id, check_type, check_name, passed, details, score_deduction)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `).run(screenshotId, id, check.check_type, check.check_name, check.passed, check.details, check.score_deduction);
+    }
 
     const updateStmt = db.prepare(`
       UPDATE urls SET last_screenshot_at = CURRENT_TIMESTAMP WHERE id = ?
     `);
     updateStmt.run(id);
 
+    const alertResult = await checkAndUpdateAlerts(id, {
+      level: qualityResult.level,
+      score: qualityResult.score,
+      flags: qualityResult.flags
+    });
+
     return {
-      id: result.lastInsertRowid,
+      id: screenshotId,
       file_path: filePath,
       file_name: fileName,
-      created_at: now.toISOString()
+      created_at: now.toISOString(),
+      quality_score: qualityResult.score,
+      quality_level: qualityResult.level,
+      quality_flags: qualityResult.flags,
+      alerts: alertResult
     };
   } catch (error) {
     console.error(`截图失败 [${url}]:`, error.message);
