@@ -1,0 +1,200 @@
+[
+  {
+    "name": "01_pure_white.png",
+    "desc": "纯白页面（应该判定为空白）",
+    "expectBlank": true,
+    "isBlank": true,
+    "correct": true,
+    "blankRatio": 1,
+    "dominantCoverage": 1,
+    "contentRatio": 0,
+    "edgeDensity": 0
+  },
+  {
+    "name": "02_near_white_offwhite.png",
+    "desc": "近白色页面 RGB(248,248,248)（应该判定为空白）",
+    "expectBlank": true,
+    "isBlank": true,
+    "correct": true,
+    "blankRatio": 1,
+    "dominantCoverage": 1,
+    "contentRatio": 0,
+    "edgeDensity": 0
+  },
+  {
+    "name": "03_pure_light_gray.png",
+    "desc": "浅灰色页面 RGB(230,230,230)（应该判定为空白）",
+    "expectBlank": true,
+    "isBlank": true,
+    "correct": true,
+    "blankRatio": 1,
+    "dominantCoverage": 1,
+    "contentRatio": 0,
+    "edgeDensity": 0
+  },
+  {
+    "name": "04_pure_black.png",
+    "desc": "纯黑页面（加载失败的空白页，应该判定为空白）",
+    "expectBlank": true,
+    "isBlank": true,
+    "correct": true,
+    "blankRatio": 1,
+    "dominantCoverage": 1,
+    "contentRatio": 0,
+    "edgeDensity": 0
+  },
+  {
+    "name": "05_pure_blue_bg.png",
+    "desc": "纯蓝色背景页面（没有内容，应该判定为空白）",
+    "expectBlank": true,
+    "isBlank": true,
+    "correct": true,
+    "blankRatio": 1,
+    "dominantCoverage": 1,
+    "contentRatio": 0,
+    "edgeDensity": 0
+  },
+  {
+    "name": "06_white_with_sparse_noise.png",
+    "desc": "白底上少量随机噪声点（噪声<3%，应该判定为空白）",
+    "expectBlank": true,
+    "isBlank": true,
+    "correct": true,
+    "blankRatio": 1,
+    "dominantCoverage": 0.9888666666666667,
+    "contentRatio": 0.0068,
+    "edgeDensity": 0.01892707460184409
+  },
+  {
+    "name": "07_white_with_colorful_noise.png",
+    "desc": "白底上散落彩色噪点（噪点5%，但仍无真实内容，应该判定为空白）",
+    "expectBlank": true,
+    "isBlank": true,
+    "correct": true,
+    "blankRatio": 0.95,
+    "dominantCoverage": 0.9646333333333333,
+    "contentRatio": 0.025433333333333332,
+    "edgeDensity": 0.06404023470243085
+  },
+  {
+    "name": "08_blue_bg_with_sparse_noise.png",
+    "desc": "蓝色背景加少量噪声（应该判定为空白）",
+    "expectBlank": true,
+    "isBlank": true,
+    "correct": true,
+    "blankRatio": 1,
+    "dominantCoverage": 0.9932666666666666,
+    "contentRatio": 0,
+    "edgeDensity": 0.0055993294216261525
+  },
+  {
+    "name": "09_gray_bg_sparse_noise.png",
+    "desc": "灰色背景加少量噪声（应该判定为空白）",
+    "expectBlank": true,
+    "isBlank": true,
+    "correct": true,
+    "blankRatio": 1,
+    "dominantCoverage": 0.9970333333333333,
+    "contentRatio": 0,
+    "edgeDensity": 0.0005364626990779547
+  },
+  {
+    "name": "10_dark_bg_sparse_noise.png",
+    "desc": "深色背景加少量噪声（加载失败场景，应该判定为空白）",
+    "expectBlank": true,
+    "isBlank": true,
+    "correct": true,
+    "blankRatio": 1,
+    "dominantCoverage": 1,
+    "contentRatio": 0,
+    "edgeDensity": 0
+  },
+  {
+    "name": "11_normal_webpage_white_bg.png",
+    "desc": "正常网页-白底有导航/标题/正文/按钮（不应该判定为空白）",
+    "expectBlank": false,
+    "isBlank": false,
+    "correct": true,
+    "blankRatio": 0.4628932187761945,
+    "dominantCoverage": 0.6706,
+    "contentRatio": 0.3294,
+    "edgeDensity": 0.012958927074601844
+  },
+  {
+    "name": "12_normal_webpage_blue_bg.png",
+    "desc": "正常网页-蓝色底有导航/标题/正文/按钮（不应该判定为空白）",
+    "expectBlank": false,
+    "isBlank": false,
+    "correct": true,
+    "blankRatio": 0.3432753841855267,
+    "dominantCoverage": 0.7042666666666667,
+    "contentRatio": 0.29573333333333335,
+    "edgeDensity": 0.010930427493713328
+  },
+  {
+    "name": "13_normal_webpage_gray_bg.png",
+    "desc": "正常网页-灰色底有内容（不应该判定为空白）",
+    "expectBlank": false,
+    "isBlank": false,
+    "correct": true,
+    "blankRatio": 0.4628932187761945,
+    "dominantCoverage": 0.6706,
+    "contentRatio": 0.3294,
+    "edgeDensity": 0.012958927074601844
+  },
+  {
+    "name": "14_simple_landing_blue_bg.png",
+    "desc": "简单着陆页-蓝色背景+白色标题+按钮（不应该判定为空白）",
+    "expectBlank": false,
+    "isBlank": false,
+    "correct": true,
+    "blankRatio": 0.4032746577256217,
+    "dominantCoverage": 0.8533333333333334,
+    "contentRatio": 0.14666666666666667,
+    "edgeDensity": 0.003352891869237217
+  },
+  {
+    "name": "15_error_page.png",
+    "desc": "错误页面-白底+红色错误标题+灰色副文本（不应该判定为空白）",
+    "expectBlank": false,
+    "isBlank": false,
+    "correct": true,
+    "blankRatio": 0.5727812950544845,
+    "dominantCoverage": 0.8907666666666667,
+    "contentRatio": 0.10923333333333334,
+    "edgeDensity": 0.009354568315171835
+  },
+  {
+    "name": "16_minimal_content.png",
+    "desc": "最少内容-白底中央一个蓝色小按钮（不应该判定为空白）",
+    "expectBlank": false,
+    "isBlank": false,
+    "correct": true,
+    "blankRatio": 0.9131666666666666,
+    "dominantCoverage": 0.9626333333333333,
+    "contentRatio": 0.037366666666666666,
+    "edgeDensity": 0.0026152556580050293
+  },
+  {
+    "name": "17_gradient_page.png",
+    "desc": "渐变页面（有颜色变化但无实际内容，应该判定为空白）",
+    "expectBlank": true,
+    "isBlank": true,
+    "correct": true,
+    "blankRatio": 1,
+    "dominantCoverage": 0.9872666666666666,
+    "contentRatio": 0,
+    "edgeDensity": 0
+  },
+  {
+    "name": "18_white_bg_text_block.png",
+    "desc": "白底+大段文字区域（不应该判定为空白）",
+    "expectBlank": false,
+    "isBlank": false,
+    "correct": true,
+    "blankRatio": 0.334485,
+    "dominantCoverage": 0.7433,
+    "contentRatio": 0.2567,
+    "edgeDensity": 0.13334450963956412
+  }
+]
